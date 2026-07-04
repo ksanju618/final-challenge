@@ -1,5 +1,5 @@
 streamlit>=1.38
-google-genai==0.3.0
+google-genai>=0.6.0
 requests==2.32.3
 bcrypt==4.2.0
 python-dotenv==1.0.1
