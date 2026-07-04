@@ -9,10 +9,11 @@ in exactly one place.
 
 import json
 
+from typing import Any
 from services import places_service, genai_service, db
 
 
-def get_personalized_attractions(user_id: int, destination: str, profile: dict) -> dict:
+def get_personalized_attractions(user_id: int, destination: str, profile: dict[str, Any]) -> dict[str, Any]:
     grounded = places_service.get_destination_places(destination)
     past_destinations = db.get_past_destinations(user_id)
 
@@ -34,7 +35,7 @@ def get_personalized_attractions(user_id: int, destination: str, profile: dict) 
     return result
 
 
-def get_story(user_id: int, destination: str, profile: dict) -> dict:
+def get_story(user_id: int, destination: str, profile: dict[str, Any]) -> dict[str, Any]:
     grounded = places_service.get_destination_places(destination)
     story = genai_service.generate_story(
         destination=grounded["resolved_name"], places=grounded["places"], profile=profile
@@ -46,7 +47,7 @@ def get_story(user_id: int, destination: str, profile: dict) -> dict:
     return {"resolved_name": grounded["resolved_name"], "story": story}
 
 
-def get_culture_and_events(user_id: int, destination: str, profile: dict) -> dict:
+def get_culture_and_events(user_id: int, destination: str, profile: dict[str, Any]) -> dict[str, Any]:
     grounded = places_service.get_destination_places(destination)
     suggestions = genai_service.suggest_events_and_culture(
         destination=grounded["resolved_name"], places=grounded["places"], profile=profile

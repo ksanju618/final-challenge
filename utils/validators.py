@@ -1,6 +1,7 @@
 """Small, dependency-free input validation helpers used by the Streamlit pages."""
 
 import re
+from typing import Any
 
 DESTINATION_PATTERN = re.compile(r"^[a-zA-Z0-9\s,.'\-]{2,60}$")
 
@@ -19,7 +20,7 @@ def clean_destination_input(raw: str) -> str:
     return value
 
 
-def clean_interests(selected: list) -> list:
+def clean_interests(selected: list[Any]) -> list[str]:
     if not selected:
         raise ValueError("Please select at least one interest.")
     return [str(i).strip() for i in selected if str(i).strip()]

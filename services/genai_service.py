@@ -11,6 +11,7 @@ import os
 import json
 from google import genai
 from google.genai import types
+from typing import Any, Optional
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MODEL_NAME = "gemini-2.0-flash"
@@ -23,7 +24,7 @@ class GenAIError(Exception):
     pass
 
 
-def _get_client():
+def _get_client() -> genai.Client:
     global _client
     if not GEMINI_API_KEY:
         raise GenAIError("GEMINI_API_KEY is not configured.")
@@ -32,7 +33,7 @@ def _get_client():
     return _client
 
 
-def _places_context(places: list) -> str:
+def _places_context(places: list[dict[str, Any]]) -> str:
     """Serializes retrieved real places into compact text for the prompt."""
     lines = []
     for p in places:
@@ -49,7 +50,9 @@ GROUNDING_RULE = (
 )
 
 
-def rank_and_personalize(destination: str, places: list, profile: dict, past_destinations: list) -> dict:
+def rank_and_personalize(
+    destination: str, places: list[dict[str, Any]], profile: dict[str, Any], past_destinations: list[str]
+) -> dict[str, Any]:
     """
     Returns structured JSON: {top_attractions: [...], hidden_gems: [...], why: str}
     top_attractions/hidden_gems reference only names from `places`.
@@ -81,11 +84,14 @@ Respond ONLY as JSON with this exact shape:
 {{"top_attractions": [{{"name": "", "reason": ""}}], "hidden_gems": [{{"name": "", "reason": ""}}], "why": ""}}
 """
 
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-        config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.4),
-    )
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.4),
+        )
+    except Exception as e:
+        raise GenAIError(f"Gemini API request failed: {e}") from e
 
     try:
         return json.loads(response.text)
@@ -93,7 +99,7 @@ Respond ONLY as JSON with this exact shape:
         raise GenAIError(f"Gemini returned an unparseable response: {e}")
 
 
-def generate_story(destination: str, places: list, profile: dict) -> str:
+def generate_story(destination: str, places: list[dict[str, Any]], profile: dict[str, Any]) -> str:
     """Returns immersive narrative text grounded in the verified places."""
     client = _get_client()
     interests = ", ".join(profile.get("interests", [])) or "general sightseeing"
@@ -110,17 +116,20 @@ tailored to someone interested in: {interests}. Use second person ("you"). Groun
 location in the list above - do not invent venue names.
 """
 
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.7),
-    )
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.7),
+        )
+    except Exception as e:
+        raise GenAIError(f"Gemini API request failed: {e}") from e
     if not response.text:
         raise GenAIError("Gemini returned an empty story response.")
     return response.text
 
 
-def suggest_events_and_culture(destination: str, places: list, profile: dict) -> str:
+def suggest_events_and_culture(destination: str, places: list[dict[str, Any]], profile: dict[str, Any]) -> str:
     """Returns cultural experience / local-event style suggestions, clearly framed as general ideas
     when not tied to a specific verified venue."""
     client = _get_client()
@@ -139,11 +148,14 @@ Clearly label anything that is a general cultural pattern rather than a specific
 you cannot verify live event calendars. Format as a short markdown bulleted list, each bullet 1-2 sentences.
 """
 
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-        config=types.GenerateContentConfig(temperature=0.6),
-    )
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.6),
+        )
+    except Exception as e:
+        raise GenAIError(f"Gemini API request failed: {e}") from e
     if not response.text:
         raise GenAIError("Gemini returned an empty cultural suggestions response.")
     return response.text

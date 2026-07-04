@@ -8,6 +8,7 @@ touching the database - the DB never stores or logs a plaintext password.
 import re
 import bcrypt
 
+from typing import Any
 from services import db
 
 USERNAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]{3,20}$")
@@ -18,14 +19,14 @@ class AuthError(Exception):
     pass
 
 
-def _validate_username(username: str):
+def _validate_username(username: str) -> None:
     if not USERNAME_PATTERN.match(username or ""):
         raise AuthError(
             "Username must be 3-20 characters and contain only letters, numbers, or underscores."
         )
 
 
-def _validate_password(password: str):
+def _validate_password(password: str) -> None:
     if not password or len(password) < 8:
         raise AuthError("Password must be at least 8 characters long.")
 
@@ -42,7 +43,7 @@ def signup(username: str, password: str) -> int:
     return db.create_user(username, password_hash)
 
 
-def login(username: str, password: str) -> dict:
+def login(username: str, password: str) -> dict[str, Any]:
     """Verifies credentials and returns the user record (without password hash) on success."""
     user = db.get_user_by_username(username)
     if not user:

@@ -1,19 +1,20 @@
 """Shared guard — preview mode for guests, full access for logged-in users."""
 
 import streamlit as st
+from typing import Any, Optional
 
 from utils.ui import prompt_login, render_login_overlay, render_preview_notice
 
 
-def get_user():
+def get_user() -> Optional[dict[str, Any]]:
     return st.session_state.get("user")
 
 
-def is_logged_in():
+def is_logged_in() -> bool:
     return bool(get_user())
 
 
-def require_login():
+def require_login() -> dict[str, Any]:
     """Return user if logged in; otherwise render preview gate and stop."""
     user = get_user()
     if user:
@@ -24,12 +25,12 @@ def require_login():
     st.stop()
 
 
-def require_login_or_none():
+def require_login_or_none() -> Optional[dict[str, Any]]:
     """Return user or None without stopping — for pages that render their own preview."""
     return get_user()
 
 
-def gate_interaction():
+def gate_interaction() -> bool:
     """Call before processing a form/button. Returns True if user may proceed."""
     if is_logged_in():
         return True

@@ -11,6 +11,7 @@ never invent new venues.
 import os
 import requests
 from functools import lru_cache
+from typing import Any, Optional
 
 OPENTRIPMAP_API_KEY = os.getenv("OPENTRIPMAP_API_KEY", "")
 OPENTRIPMAP_BASE = "https://api.opentripmap.com/0.1/en/places"
@@ -25,34 +26,41 @@ class PlacesServiceError(Exception):
 
 
 @lru_cache(maxsize=64)
-def _geocode(destination: str):
+def _geocode(destination: str) -> tuple[float, float, str]:
     """Resolves a free-text destination name to lat/lon using OpenTripMap's geoname endpoint."""
-    resp = requests.get(
-        f"{OPENTRIPMAP_BASE}/geoname",
-        params={"name": destination, "apikey": OPENTRIPMAP_API_KEY},
-        timeout=REQUEST_TIMEOUT,
-    )
+    try:
+        resp = requests.get(
+            f"{OPENTRIPMAP_BASE}/geoname",
+            params={"name": destination, "apikey": OPENTRIPMAP_API_KEY},
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.RequestException as e:
+        raise PlacesServiceError(f"Geocoding network request failed for '{destination}': {e}") from e
+
     if resp.status_code != 200:
         raise PlacesServiceError(f"Could not geocode '{destination}' (status {resp.status_code}).")
     data = resp.json()
     if "lat" not in data or "lon" not in data:
         raise PlacesServiceError(f"'{destination}' was not recognized as a real location.")
-    return data["lat"], data["lon"], data.get("name", destination)
+    return float(data["lat"]), float(data["lon"]), str(data.get("name", destination))
 
 
-def _fetch_place_detail(xid: str):
-    resp = requests.get(
-        f"{OPENTRIPMAP_BASE}/xid/{xid}",
-        params={"apikey": OPENTRIPMAP_API_KEY},
-        timeout=REQUEST_TIMEOUT,
-    )
+def _fetch_place_detail(xid: str) -> Optional[dict[str, Any]]:
+    try:
+        resp = requests.get(
+            f"{OPENTRIPMAP_BASE}/xid/{xid}",
+            params={"apikey": OPENTRIPMAP_API_KEY},
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.RequestException:
+        return None
     if resp.status_code != 200:
         return None
     return resp.json()
 
 
 @lru_cache(maxsize=64)
-def _wikipedia_summary(title: str):
+def _wikipedia_summary(title: str) -> Optional[str]:
     try:
         resp = requests.get(WIKIPEDIA_SUMMARY_URL.format(title=title), timeout=REQUEST_TIMEOUT)
         if resp.status_code == 200:
@@ -62,7 +70,7 @@ def _wikipedia_summary(title: str):
     return None
 
 
-def get_destination_places(destination: str, radius_m: int = 12000, limit: int = 20):
+def get_destination_places(destination: str, radius_m: int = 12000, limit: int = 20) -> dict[str, Any]:
     """
     Returns a list of real, verifiable places near `destination`.
 
@@ -76,20 +84,24 @@ def get_destination_places(destination: str, radius_m: int = 12000, limit: int =
 
     lat, lon, resolved_name = _geocode(destination)
 
-    resp = requests.get(
-        f"{OPENTRIPMAP_BASE}/radius",
-        params={
-            "radius": radius_m,
-            "lon": lon,
-            "lat": lat,
-            "kinds": "interesting_places,cultural,historic,museums,architecture",
-            "rate": 1,
-            "format": "json",
-            "limit": limit,
-            "apikey": OPENTRIPMAP_API_KEY,
-        },
-        timeout=REQUEST_TIMEOUT,
-    )
+    try:
+        resp = requests.get(
+            f"{OPENTRIPMAP_BASE}/radius",
+            params={
+                "radius": radius_m,
+                "lon": lon,
+                "lat": lat,
+                "kinds": "interesting_places,cultural,historic,museums,architecture",
+                "rate": 1,
+                "format": "json",
+                "limit": limit,
+                "apikey": OPENTRIPMAP_API_KEY,
+            },
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.RequestException as e:
+        raise PlacesServiceError(f"Places lookup query failed for '{destination}': {e}") from e
+
     if resp.status_code != 200:
         raise PlacesServiceError(f"Places lookup failed for '{destination}' (status {resp.status_code}).")
 

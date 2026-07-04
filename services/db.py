@@ -18,18 +18,19 @@ import os
 import json
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from typing import Any, Generator, Optional
 
 DB_PATH = os.getenv("DB_PATH", "data/app.db")
 
 
-def _ensure_data_dir():
+def _ensure_data_dir() -> None:
     directory = os.path.dirname(DB_PATH)
     if directory and not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
 
 
 @contextmanager
-def get_connection():
+def get_connection() -> Generator[sqlite3.Connection, None, None]:
     """Yields a SQLite connection with foreign keys enabled, and commits/closes safely."""
     _ensure_data_dir()
     conn = sqlite3.connect(DB_PATH)
@@ -45,7 +46,7 @@ def get_connection():
         conn.close()
 
 
-def init_db():
+def init_db() -> None:
     """Creates all tables if they do not already exist. Safe to call on every app start."""
     with get_connection() as conn:
         conn.executescript(
@@ -96,7 +97,7 @@ def create_user(username: str, password_hash: str) -> int:
         return user_id
 
 
-def get_user_by_username(username: str):
+def get_user_by_username(username: str) -> Optional[dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         return dict(row) if row else None
@@ -108,7 +109,7 @@ def username_exists(username: str) -> bool:
 
 # ---------- Profile ----------
 
-def get_profile(user_id: int):
+def get_profile(user_id: int) -> Optional[dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute(
             "SELECT * FROM user_profile WHERE user_id = ?", (user_id,)
@@ -120,7 +121,7 @@ def get_profile(user_id: int):
         return profile
 
 
-def save_profile(user_id: int, interests: list, experience_level: str, travel_style: str):
+def save_profile(user_id: int, interests: list[str], experience_level: str, travel_style: str) -> None:
     with get_connection() as conn:
         conn.execute(
             """
@@ -134,7 +135,7 @@ def save_profile(user_id: int, interests: list, experience_level: str, travel_st
 
 # ---------- Search history ----------
 
-def log_search(user_id: int, destination: str, query_type: str, raw_response: str):
+def log_search(user_id: int, destination: str, query_type: str, raw_response: str) -> None:
     with get_connection() as conn:
         conn.execute(
             """
@@ -145,13 +146,13 @@ def log_search(user_id: int, destination: str, query_type: str, raw_response: st
         )
 
 
-def get_history(user_id: int, limit: int = 20):
+def get_history(user_id: int, limit: int = 20) -> list[dict[str, Any]]:
     with get_connection() as conn:
         rows = conn.execute(
             """
             SELECT * FROM search_history
             WHERE user_id = ?
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             LIMIT ?
             """,
             (user_id, limit),
@@ -159,7 +160,7 @@ def get_history(user_id: int, limit: int = 20):
         return [dict(r) for r in rows]
 
 
-def get_past_destinations(user_id: int) -> list:
+def get_past_destinations(user_id: int) -> list[str]:
     """Distinct destinations a user has searched before - used to personalize future prompts."""
     with get_connection() as conn:
         rows = conn.execute(
